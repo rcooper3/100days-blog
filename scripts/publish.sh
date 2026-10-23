@@ -1,6 +1,10 @@
 #!/bin/bash
-# Daily publish: freeze the Flask app to build/, upload it to S3, and clear
-# the CloudFront cache so the new post shows up straight away.
+# Daily publish: freeze the Flask app to build/, upload it to S3, clear
+# the CloudFront cache so the new post shows up straight away, then commit
+# and push to GitHub as a backup.
+#
+#   ./scripts/publish.sh                    # commit message: "Day N: <title>"
+#   ./scripts/publish.sh "Fix typo in day 3"  # custom commit message
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -28,5 +32,21 @@ aws s3 sync "$PROJECT_ROOT/build/" "s3://$BUCKET/" \
 echo "==> Invalidating CloudFront cache"
 aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" > /dev/null
 
-echo ""
 echo "Published: https://${DOMAIN_NAME:-100days.cyberako.blog}"
+
+echo "==> Backing up to GitHub"
+git add -A
+if git diff --cached --quiet; then
+  echo "Nothing new to commit"
+else
+  # Default message names the latest published post, e.g. "Day 4: Collections module".
+  MESSAGE=${1:-$("$PYTHON" -c "from posts import load_posts; p = load_posts()[0]; print(f'Day {p.day}: {p.title}')")}
+  git commit -q -m "$MESSAGE"
+  echo "Committed: $MESSAGE"
+fi
+# The site is already live at this point, so a failed push is a warning, not an error.
+if git push -q; then
+  echo "Pushed to $(git remote get-url origin)"
+else
+  echo "WARNING: git push failed. The site is published; run 'git push' once fixed."
+fi

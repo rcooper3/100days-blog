@@ -33,8 +33,13 @@ python new_post.py                 # creates content/posts/day-NNN.md as a draft
 flask --app app run --debug        # preview at http://127.0.0.1:5000 (drafts shown)
 
 # edit the post, then set `draft: false` in its front matter
-./scripts/publish.sh               # freeze, upload to S3, clear the CloudFront cache
+./scripts/publish.sh               # freeze, upload to S3, clear the CloudFront cache, commit + push
 ```
+
+`publish.sh` finishes by committing everything to git with the message
+`Day N: <title>` (from the latest published post) and pushing to GitHub.
+Pass a message to override it, e.g. `./scripts/publish.sh "Fix typo in day 3"`.
+If the push fails, the site is still published; just run `git push` later.
 
 `python freeze.py --serve` previews the frozen site exactly as it will be
 published, at http://127.0.0.1:8000. Drafts are not included.

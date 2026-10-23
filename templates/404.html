@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}Not found · {{ site.title }}{% endblock %}
+
+{% block content %}
+<article class="post">
+  <h1>Page not found</h1>
+  <p>That day hasn't been written yet, or the link is wrong. <a href="{{ url_for('index') }}">Back to the log</a>.</p>
+</article>
+{% endblock %}

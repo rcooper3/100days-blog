@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site.title }}{% endblock %}</title>
+  <meta name="description" content="{% block description %}{{ site.description }}{% endblock %}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('pygments_css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="alternate" type="application/rss+xml" title="{{ site.title }}" href="{{ url_for('feed') }}">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">100</span> {{ site.title }}</a>
+      <nav>
+        <a href="{{ url_for('index') }}">Log</a>
+        <a href="{{ url_for('about') }}">About</a>
+        <a href="{{ url_for('feed') }}">RSS</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      Built with Python, Flask and Frozen-Flask.
+      Following <a href="https://training.talkpython.fm/courses/explore_100days_in_python/100-days-of-code-in-python">#100DaysOfCode in Python</a> from Talk Python.
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <h1>{{ site.title }}</h1>
+  <p class="lede">{{ site.description }}</p>
+
+  <div class="progress" aria-label="{{ done }} of {{ site.total_days }} days logged">
+    <div class="progress-count"><strong>{{ done }}</strong> / {{ site.total_days }} days</div>
+    <ol class="grid">
+      {% for day, p in grid %}
+        {% if p %}
+          <li class="done"><a href="{{ url_for('post', slug=p.slug) }}" title="Day {{ day }}: {{ p.title }}">{{ day }}</a></li>
+        {% else %}
+          <li title="Day {{ day }}">{{ day }}</li>
+        {% endif %}
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<section class="log">
+  {% for p in posts %}
+    <article class="entry">
+      <div class="entry-meta">
+        <span class="day-badge">{% if p.day %}Day {{ p.day }}{% else %}Day 0{% endif %}</span>
+        <time datetime="{{ p.date.isoformat() }}">{{ p.date | nice_date }}</time>
+        {% if p.module %}<span class="topic">{{ p.module[1] }}</span>{% endif %}
+        {% if p.draft %}<span class="draft">Draft</span>{% endif %}
+      </div>
+      <h2><a href="{{ url_for('post', slug=p.slug) }}">{{ p.title }}</a></h2>
+      {% if p.summary %}<p>{{ p.summary }}</p>{% endif %}
+    </article>
+  {% else %}
+    <p>No posts yet. Day 1 is coming soon.</p>
+  {% endfor %}
+</section>
+{% endblock %}

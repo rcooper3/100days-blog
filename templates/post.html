@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Day {{ post.day }}: {{ post.title }} · {{ site.title }}{% endblock %}
+{% block description %}{{ post.summary }}{% endblock %}
+
+{% block content %}
+<article class="post">
+  <header>
+    <div class="entry-meta">
+      <span class="day-badge">Day {{ post.day }}</span>
+      <time datetime="{{ post.date.isoformat() }}">{{ post.date | nice_date }}</time>
+      {% if post.draft %}<span class="draft">Draft</span>{% endif %}
+    </div>
+    <h1>{{ post.title }}</h1>
+    {% if post.module %}
+      <p class="module">
+        {{ post.module[1] }} · day {{ post.module[2] }} of {{ 3 if post.day < 100 else 1 }}
+        · <a href="{{ post.course_url }}">course materials</a>
+        {% if post.code %} · <a href="{{ post.code }}">my code</a>{% endif %}
+      </p>
+    {% elif post.code %}
+      <p class="module"><a href="{{ post.code }}">my code</a></p>
+    {% endif %}
+  </header>
+
+  <div class="prose">
+    {{ post.body_html | safe }}
+  </div>
+
+  {% if post.tags %}
+    <ul class="tags">{% for tag in post.tags %}<li>{{ tag }}</li>{% endfor %}</ul>
+  {% endif %}
+</article>
+
+<nav class="pager">
+  {% if older %}<a class="older" href="{{ url_for('post', slug=older.slug) }}">← Day {{ older.day }}: {{ older.title }}</a>{% else %}<span></span>{% endif %}
+  {% if newer %}<a class="newer" href="{{ url_for('post', slug=newer.slug) }}">Day {{ newer.day }}: {{ newer.title }} →</a>{% endif %}
+</nav>
+{% endblock %}

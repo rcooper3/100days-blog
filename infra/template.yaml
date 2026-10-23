@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 100 Days of Code blog - static site on S3 + CloudFront
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: 100days.cyberako.blog
+    Description: Custom domain for the blog, mapped via a CNAME in WordPress.com DNS
+
+  CertificateArn:
+    Type: String
+    Description: ACM certificate ARN for DomainName, must be issued in us-east-1 (required by CloudFront)
+
+Resources:
+  # ── Site files ────────────────────────────────────
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "cyberako-100days-blog-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # Only this CloudFront distribution can read the bucket (via OAC) — the
+  # bucket itself stays fully private.
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::${SiteBucket}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # ── CloudFront ────────────────────────────────────
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: 100days-blog-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Frozen-Flask writes /days/001/ as days/001/index.html. S3 (via OAC) has
+  # no directory indexes, so map "/days/001/" and "/days/001" to that file.
+  IndexRewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: 100days-blog-index-rewrite
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Append index.html to directory-style URLs
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          if (uri.endsWith('/')) {
+            request.uri = uri + 'index.html';
+          } else if (uri.split('/').pop().indexOf('.') === -1) {
+            request.uri = uri + '/index.html';
+          }
+          return request;
+        }
+
+  # The site is plain HTML/CSS with no JavaScript, so the CSP can be strict.
+  SecurityHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub "100days-blog-security-headers-${AWS::AccountId}"
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            Override: true
+            ContentSecurityPolicy: "default-src 'self'; script-src 'none'; style-src 'self'; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'"
+          FrameOptions:
+            Override: true
+            FrameOption: DENY
+          ContentTypeOptions:
+            Override: true
+          ReferrerPolicy:
+            Override: true
+            ReferrerPolicy: strict-origin-when-cross-origin
+          StrictTransportSecurity:
+            Override: true
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: false
+            Preload: false
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: 100 Days of Code blog
+        DefaultRootObject: index.html
+        Enabled: true
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200    # US/EU/Canada + Asia Pacific (covers AU)
+        Aliases:
+          - !Ref DomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: site-s3
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: site-s3
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt IndexRewriteFunction.FunctionMetadata.FunctionARN
+        # S3 with OAC returns 403 (not 404) for missing keys.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /404.html
+          - ErrorCode: 404
+            ResponseCode: 404
+            ResponsePagePath: /404.html
+
+Outputs:
+  SiteBucket:
+    Description: S3 bucket the frozen site is synced to
+    Value: !Ref SiteBucket
+
+  DistributionId:
+    Description: CloudFront distribution ID (for cache invalidations)
+    Value: !Ref CloudFrontDistribution
+
+  CloudFrontUrl:
+    Description: CloudFront URL for the blog
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+
+  CustomDomainCname:
+    Description: >
+      Add this as a CNAME in WordPress.com DNS (Domains > cyberako.blog > DNS records):
+      Name = 100days, Value = this output
+    Value: !GetAtt CloudFrontDistribution.DomainName
